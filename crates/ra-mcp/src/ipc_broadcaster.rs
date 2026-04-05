@@ -74,7 +74,7 @@ impl IpcBroadcaster {
                 let mut disconnected = Vec::new();
 
                 for (i, client) in clients.iter_mut().enumerate() {
-                    if let Err(_) = client.write_all(bytes).await {
+                    if client.write_all(bytes).await.is_err() {
                         disconnected.push(i);
                     }
                 }

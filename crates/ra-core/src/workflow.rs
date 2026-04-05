@@ -81,17 +81,12 @@ fn default_condition() -> DependencyCondition {
     DependencyCondition::Success
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DependencyCondition {
+    #[default]
     Success,
     Failure,
     Always,
-}
-
-impl Default for DependencyCondition {
-    fn default() -> Self {
-        DependencyCondition::Success
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

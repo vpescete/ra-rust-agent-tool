@@ -113,13 +113,11 @@ impl HistoryStore {
                 let started_at = DateTime::parse_from_rfc3339(&started_str)
                     .map_err(|e| RaError::Database(e.to_string()))?
                     .with_timezone(&Utc);
-                let completed_at = completed_str
-                    .map(|s| {
-                        DateTime::parse_from_rfc3339(&s)
-                            .map(|t| t.with_timezone(&Utc))
-                            .ok()
-                    })
-                    .flatten();
+                let completed_at = completed_str.and_then(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .map(|t| t.with_timezone(&Utc))
+                        .ok()
+                });
 
                 executions.push(Execution {
                     id,

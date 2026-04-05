@@ -38,18 +38,13 @@ impl AgentState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub enum AgentPriority {
     Low = 0,
+    #[default]
     Normal = 1,
     High = 2,
     Critical = 3,
-}
-
-impl Default for AgentPriority {
-    fn default() -> Self {
-        AgentPriority::Normal
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

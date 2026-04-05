@@ -43,6 +43,7 @@ impl Handler {
     // Helper: parse agent definitions from JSON params
     // =====================================================================
 
+    #[allow(clippy::type_complexity)]
     fn parse_agent_defs(
         params: &serde_json::Value,
     ) -> Result<
@@ -911,14 +912,16 @@ impl Handler {
             .map_err(|e| format!("Workflow validation error: {}", e))?;
 
         // Ensure description is in the YAML
-        let final_yaml = if description.is_some() && !yaml.contains("description:") {
-            // Insert description after name line
-            let desc = description.unwrap();
-            yaml.replacen(
-                &format!("name: \"{}\"", _workflow.name),
-                &format!("name: \"{}\"\ndescription: \"{}\"", _workflow.name, desc),
-                1,
-            )
+        let final_yaml = if let Some(desc) = description {
+            if !yaml.contains("description:") {
+                yaml.replacen(
+                    &format!("name: \"{}\"", _workflow.name),
+                    &format!("name: \"{}\"\ndescription: \"{}\"", _workflow.name, desc),
+                    1,
+                )
+            } else {
+                yaml.to_string()
+            }
         } else {
             yaml.to_string()
         };

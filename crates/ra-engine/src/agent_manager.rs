@@ -45,7 +45,7 @@ impl AgentManager {
 
         agent
             .transition_to(AgentState::Running)
-            .map_err(|e| RaError::WorkflowValidation(e))?;
+            .map_err(RaError::WorkflowValidation)?;
 
         // Emit state change to broadcast
         let state_event = AgentEvent::StateChanged {

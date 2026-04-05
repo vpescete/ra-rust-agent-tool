@@ -89,13 +89,14 @@ impl ContextManager {
     }
 
     pub async fn update(&self, agent_id: Uuid, event: &StreamEvent) {
-        if let StreamEvent::Result { usage, .. } = event {
-            if let Some(u) = usage {
-                let total = u.input_tokens + u.output_tokens;
-                let mut budgets = self.budgets.write().await;
-                if let Some(budget) = budgets.get_mut(&agent_id) {
-                    budget.consumed = total;
-                }
+        if let StreamEvent::Result {
+            usage: Some(u), ..
+        } = event
+        {
+            let total = u.input_tokens + u.output_tokens;
+            let mut budgets = self.budgets.write().await;
+            if let Some(budget) = budgets.get_mut(&agent_id) {
+                budget.consumed = total;
             }
         }
     }
