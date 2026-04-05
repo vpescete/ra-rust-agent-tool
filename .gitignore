@@ -1,0 +1,19 @@
+/target
+**/*.rs.bk
+*.swp
+*.swo
+.env
+*.db
+
+# Local Claude Code config (contains user-specific MCP settings)
+.claude.json
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml

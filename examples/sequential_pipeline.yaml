@@ -1,0 +1,48 @@
+name: "sequential-pipeline"
+description: "A→B→C linear pipeline where each step builds on the previous"
+
+config:
+  max_concurrency: 1
+
+steps:
+  - id: analyze
+    name: "Analyze"
+    prompt: |
+      List the top 5 most important files in this project.
+      For each file, give a one-line description.
+      Output as a numbered list.
+    agent_config:
+      model: haiku
+      allowed_tools:
+        - Glob
+        - Read
+    output_var: analysis
+
+  - id: summarize
+    name: "Summarize"
+    prompt: |
+      Based on this analysis of important files:
+      {{analysis}}
+
+      Write a 3-sentence project summary.
+    agent_config:
+      model: haiku
+    depends_on:
+      - step_id: analyze
+        condition: Success
+    output_var: summary
+
+  - id: recommend
+    name: "Recommend"
+    prompt: |
+      Based on this project summary:
+      {{summary}}
+
+      Suggest 3 improvements that would have the highest impact.
+      Be specific and actionable.
+    agent_config:
+      model: haiku
+    depends_on:
+      - step_id: summarize
+        condition: Success
+    output_var: recommendations

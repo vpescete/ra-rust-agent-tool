@@ -1,0 +1,68 @@
+name: "test-generator"
+description: "Analyze code, generate unit tests, and validate coverage"
+
+parameters:
+  - name: target_path
+    description: "Path to the code to generate tests for"
+    default: "."
+  - name: test_framework
+    description: "Test framework to use"
+    required: false
+    default: "auto-detect"
+
+config:
+  max_concurrency: 2
+  max_total_budget_usd: 3.0
+  timeout_seconds: 600
+
+steps:
+  - id: analyze
+    name: "Analyze Testability"
+    prompt: |
+      Analyze {{target_path}} for testability.
+      Framework: {{test_framework}}
+
+      For each file, identify: untested public functions, complex logic paths,
+      error handling to test, edge cases, dependencies to mock.
+      Output structured analysis. Keep under 1000 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+    output_var: test_analysis
+
+  - id: generate
+    name: "Generate Tests"
+    prompt: |
+      Based on this analysis:
+      {{test_analysis}}
+
+      Generate complete, runnable unit tests.
+      Each test: one behavior, descriptive name, proper assertions, mocked deps.
+      Output ready-to-use test code.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 1.25
+    depends_on:
+      - step_id: analyze
+        condition: Success
+    output_var: generated_tests
+
+  - id: validate
+    name: "Validate Tests"
+    prompt: |
+      Review these tests for correctness:
+      {{generated_tests}}
+
+      Check: compilation errors, tautological tests, missing assertions,
+      incorrect expected values, order-dependent tests, side effects.
+      Output corrected tests with explanation of changes.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 1.00
+    depends_on:
+      - step_id: generate
+        condition: Success
+    output_var: validated_tests

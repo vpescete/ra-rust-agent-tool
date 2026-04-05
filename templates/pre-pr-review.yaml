@@ -1,0 +1,101 @@
+name: "pre-pr-review"
+description: "Comprehensive pre-PR review: security, quality, test coverage analysis with synthesis"
+
+parameters:
+  - name: target_path
+    description: "Path to the code to review"
+    default: "."
+
+config:
+  max_concurrency: 3
+  max_total_budget_usd: 3.0
+  timeout_seconds: 600
+
+steps:
+  - id: security
+    name: "Security Review"
+    prompt: |
+      You are a security reviewer. Analyze the code at {{target_path}} for:
+      - Injection vulnerabilities (SQL, command, path traversal)
+      - Authentication and authorization flaws
+      - Data exposure risks (secrets, PII leakage)
+      - Dependency vulnerabilities
+      - Input validation gaps
+
+      Output a structured report with severity (Critical/High/Medium/Low) for each finding.
+      Include file paths and line references. Keep under 800 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+      priority: High
+    output_var: security_findings
+
+  - id: quality
+    name: "Code Quality Review"
+    prompt: |
+      You are a code quality reviewer. Analyze the code at {{target_path}} for:
+      - Code duplication and DRY violations
+      - Error handling completeness
+      - Naming conventions and readability
+      - Dead code and unused imports
+      - Complexity hotspots
+      - API design issues
+
+      Output a structured report with impact ratings. Keep under 800 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+    output_var: quality_findings
+
+  - id: test_coverage
+    name: "Test Coverage Analysis"
+    prompt: |
+      You are a test coverage analyst. Analyze the code at {{target_path}} for:
+      - Which functions/methods lack tests
+      - Edge cases not covered by existing tests
+      - Integration test gaps
+      - Missing error path tests
+      - Test quality (assertions, mocking patterns)
+
+      Output a structured report with priority. Keep under 800 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+    output_var: test_findings
+
+  - id: synthesize
+    name: "Synthesis Report"
+    prompt: |
+      Synthesize these three review reports into a unified, actionable PR review.
+
+      ## Security Findings
+      {{security_findings}}
+
+      ## Code Quality Findings
+      {{quality_findings}}
+
+      ## Test Coverage Findings
+      {{test_findings}}
+
+      Create a prioritized action list:
+      1. Must-fix before merge (blockers)
+      2. Should-fix (high priority)
+      3. Nice-to-have improvements
+
+      Be specific with file:line references. Maximum 15 items total.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read]
+      max_budget_usd: 0.75
+      priority: High
+    depends_on:
+      - step_id: security
+        condition: Success
+      - step_id: quality
+        condition: Success
+      - step_id: test_coverage
+        condition: Success
+    output_var: review_report

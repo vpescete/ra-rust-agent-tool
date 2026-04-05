@@ -1,0 +1,120 @@
+name: "bug-hunt"
+description: "5 agents search for bugs from different angles, then deduplicate findings"
+
+parameters:
+  - name: target_path
+    description: "Path to search for bugs"
+    default: "."
+  - name: bug_description
+    description: "Optional description of bug symptoms"
+    required: false
+    default: ""
+
+config:
+  max_concurrency: 5
+  max_total_budget_usd: 4.0
+  timeout_seconds: 900
+
+steps:
+  - id: error_paths
+    name: "Error Path Analysis"
+    prompt: |
+      Search {{target_path}} for bugs in error handling.
+      {{bug_description}}
+      Look for: unhandled errors, resource leaks on error paths, panics.
+      Report each with file:line and severity. Keep under 500 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.60
+    output_var: error_path_bugs
+
+  - id: concurrency
+    name: "Concurrency Bug Hunt"
+    prompt: |
+      Search {{target_path}} for concurrency bugs.
+      {{bug_description}}
+      Look for: data races, deadlocks, blocking in async, channel misuse.
+      Report each with file:line and severity. Keep under 500 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.60
+    output_var: concurrency_bugs
+
+  - id: logic
+    name: "Logic Bug Hunt"
+    prompt: |
+      Search {{target_path}} for logic bugs.
+      {{bug_description}}
+      Look for: off-by-one, boundary errors, wrong boolean logic, overflow.
+      Report each with file:line and severity. Keep under 500 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.60
+    output_var: logic_bugs
+
+  - id: edge_cases
+    name: "Edge Case Analysis"
+    prompt: |
+      Search {{target_path}} for unhandled edge cases.
+      {{bug_description}}
+      Look for: empty collections, null handling, unicode, large inputs, timeouts.
+      Report each with file:line and severity. Keep under 500 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.60
+    output_var: edge_case_bugs
+
+  - id: api_contract
+    name: "API Contract Violations"
+    prompt: |
+      Search {{target_path}} for API contract violations.
+      {{bug_description}}
+      Look for: broken contracts, incorrect serialization, missing validation.
+      Report each with file:line and severity. Keep under 500 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.60
+    output_var: api_bugs
+
+  - id: deduplicate
+    name: "Deduplicate and Prioritize"
+    prompt: |
+      Deduplicate and prioritize these 5 bug reports:
+
+      ## Error Paths
+      {{error_path_bugs}}
+      ## Concurrency
+      {{concurrency_bugs}}
+      ## Logic
+      {{logic_bugs}}
+      ## Edge Cases
+      {{edge_case_bugs}}
+      ## API Contracts
+      {{api_bugs}}
+
+      Remove duplicates, rate confidence, group by severity. Max 20 bugs.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read]
+      max_budget_usd: 1.00
+      priority: High
+    depends_on:
+      - step_id: error_paths
+        condition: Success
+      - step_id: concurrency
+        condition: Success
+      - step_id: logic
+        condition: Success
+      - step_id: edge_cases
+        condition: Success
+      - step_id: api_contract
+        condition: Success
+    on_failure:
+      retry:
+        max_attempts: 2
+    output_var: bug_report

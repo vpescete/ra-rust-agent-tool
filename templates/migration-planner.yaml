@@ -1,0 +1,80 @@
+name: "migration-planner"
+description: "Analyze current codebase and generate a migration plan to a target technology"
+
+parameters:
+  - name: target_path
+    description: "Path to the codebase to migrate"
+    default: "."
+  - name: target_tech
+    description: "Target technology/framework/version to migrate to"
+    required: true
+  - name: constraints
+    description: "Migration constraints"
+    required: false
+    default: "none"
+
+config:
+  max_concurrency: 2
+  max_total_budget_usd: 3.0
+  timeout_seconds: 600
+
+steps:
+  - id: analyze_current
+    name: "Analyze Current State"
+    prompt: |
+      Analyze the codebase at {{target_path}} for migration.
+      Document: current tech stack, architecture, external dependencies,
+      API surface, test coverage, configuration.
+      Be thorough. Keep under 1000 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+    output_var: current_state
+
+  - id: research_target
+    name: "Research Target"
+    prompt: |
+      Based on this analysis:
+      {{current_state}}
+
+      Research migration to: {{target_tech}}
+      Constraints: {{constraints}}
+
+      Document: breaking changes, deprecated APIs, new patterns needed,
+      dependency compatibility, known pitfalls.
+      Keep under 1000 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.75
+    depends_on:
+      - step_id: analyze_current
+        condition: Success
+    output_var: target_research
+
+  - id: generate_plan
+    name: "Generate Migration Plan"
+    prompt: |
+      Create a migration plan:
+
+      ## Current State
+      {{current_state}}
+
+      ## Target Research
+      {{target_research}}
+
+      Target: {{target_tech}}
+      Constraints: {{constraints}}
+
+      Generate phased plan with: specific files to change, estimated effort,
+      risk assessment, rollback strategy, verification steps per phase.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read]
+      max_budget_usd: 1.50
+      priority: High
+    depends_on:
+      - step_id: research_target
+        condition: Success
+    output_var: migration_plan

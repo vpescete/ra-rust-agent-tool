@@ -1,0 +1,13 @@
+name: "hello-world"
+description: "Simple single-step workflow to test RA"
+
+config:
+  max_concurrency: 1
+
+steps:
+  - id: greet
+    name: "Greeting"
+    prompt: "Say hello and tell me a fun fact about Rust programming language. Keep it to 2 sentences."
+    agent_config:
+      model: haiku
+    output_var: greeting

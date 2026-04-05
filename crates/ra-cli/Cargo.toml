@@ -1,0 +1,25 @@
+[package]
+name = "ra-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI for RA — Rust Agent Orchestrator for Claude Code"
+
+[dependencies]
+ra-core = { path = "../ra-core" }
+ra-engine = { path = "../ra-engine" }
+ra-store = { path = "../ra-store" }
+ra-observe = { path = "../ra-observe" }
+tokio = { workspace = true }
+clap = { version = "4.0", features = ["derive"] }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+dotenvy = "0.15"
+
+[[bin]]
+name = "ra"
+path = "src/main.rs"

@@ -1,0 +1,81 @@
+name: "codebase-onboard"
+description: "Generate a comprehensive onboarding guide for a new codebase"
+
+parameters:
+  - name: target_path
+    description: "Root path of the codebase"
+    default: "."
+
+config:
+  max_concurrency: 3
+  max_total_budget_usd: 2.5
+  timeout_seconds: 600
+
+steps:
+  - id: structure
+    name: "Analyze Structure"
+    prompt: |
+      Analyze the project structure at {{target_path}}.
+      Determine: project type, languages, directory organization, build system,
+      entry points, configuration files.
+      Output a structured overview. Keep under 600 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.50
+    output_var: structure_analysis
+
+  - id: patterns
+    name: "Identify Patterns"
+    prompt: |
+      Analyze the codebase at {{target_path}} for architectural patterns.
+      Identify: design patterns, error handling, testing patterns, naming conventions,
+      module organization, key abstractions.
+      Output a structured list with code examples. Keep under 600 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.50
+    output_var: patterns_analysis
+
+  - id: dependencies
+    name: "Dependency Map"
+    prompt: |
+      Analyze dependencies at {{target_path}}.
+      Map: external dependencies, internal module graph, key interfaces, data flow.
+      Output a structured dependency overview. Keep under 600 words.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read, Glob, Grep]
+      max_budget_usd: 0.50
+    output_var: dependency_analysis
+
+  - id: generate_guide
+    name: "Generate Onboarding Guide"
+    prompt: |
+      Create a developer onboarding guide based on:
+
+      ## Project Structure
+      {{structure_analysis}}
+
+      ## Architecture Patterns
+      {{patterns_analysis}}
+
+      ## Dependencies
+      {{dependency_analysis}}
+
+      Cover: quick start, architecture overview, key concepts, code navigation,
+      how to add a feature, testing guide, common pitfalls.
+    agent_config:
+      model: sonnet
+      allowed_tools: [Read]
+      max_budget_usd: 1.00
+      priority: High
+    depends_on:
+      - step_id: structure
+        condition: Success
+      - step_id: patterns
+        condition: Success
+      - step_id: dependencies
+        condition: Success
+    output_var: onboarding_guide

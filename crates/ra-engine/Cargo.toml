@@ -1,0 +1,17 @@
+[package]
+name = "ra-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ra-core = { path = "../ra-core" }
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["rt"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }

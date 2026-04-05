@@ -1,0 +1,92 @@
+name: "parallel-code-review"
+description: "Review code from multiple angles in parallel, then synthesize"
+
+config:
+  max_concurrency: 3
+  max_total_budget_usd: 2.0
+  timeout_seconds: 600
+
+steps:
+  - id: security
+    name: "Security Review"
+    prompt: |
+      Review the code in the current directory for security vulnerabilities.
+      Focus on: injection risks, auth bypass, data exposure, dependency risks.
+      Output a structured list of findings with severity ratings.
+      Keep your response concise (under 500 words).
+    agent_config:
+      model: sonnet
+      allowed_tools:
+        - Read
+        - Glob
+        - Grep
+      max_budget_usd: 0.50
+      priority: High
+    output_var: security_findings
+
+  - id: performance
+    name: "Performance Review"
+    prompt: |
+      Review the code in the current directory for performance issues.
+      Focus on: unnecessary allocations, blocking calls, algorithmic complexity.
+      Output a structured list of findings with impact ratings.
+      Keep your response concise (under 500 words).
+    agent_config:
+      model: sonnet
+      allowed_tools:
+        - Read
+        - Glob
+        - Grep
+      max_budget_usd: 0.50
+      priority: Normal
+    output_var: perf_findings
+
+  - id: architecture
+    name: "Architecture Review"
+    prompt: |
+      Review the code in the current directory for architectural issues.
+      Focus on: coupling, cohesion, separation of concerns, error handling, testability.
+      Output a structured list of findings.
+      Keep your response concise (under 500 words).
+    agent_config:
+      model: sonnet
+      allowed_tools:
+        - Read
+        - Glob
+        - Grep
+      max_budget_usd: 0.50
+      priority: Normal
+    output_var: arch_findings
+
+  - id: synthesize
+    name: "Synthesize Findings"
+    prompt: |
+      You are given three code review reports. Synthesize them into a single
+      actionable review document, organized by priority (critical, high, medium, low).
+
+      ## Security Findings
+      {{security_findings}}
+
+      ## Performance Findings
+      {{perf_findings}}
+
+      ## Architecture Findings
+      {{arch_findings}}
+
+      Create a unified report with the top 10 most important findings.
+    agent_config:
+      model: sonnet
+      allowed_tools:
+        - Read
+      max_budget_usd: 0.50
+      priority: High
+    depends_on:
+      - step_id: security
+        condition: Success
+      - step_id: performance
+        condition: Success
+      - step_id: architecture
+        condition: Success
+    on_failure:
+      retry:
+        max_attempts: 2

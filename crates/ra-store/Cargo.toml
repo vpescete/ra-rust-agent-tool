@@ -1,0 +1,16 @@
+[package]
+name = "ra-store"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ra-core = { path = "../ra-core" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }

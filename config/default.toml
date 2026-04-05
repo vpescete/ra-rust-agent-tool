@@ -1,0 +1,25 @@
+[runtime]
+max_concurrency = 4
+claude_binary = "claude"  # auto-detected from PATH if not set
+default_model = "sonnet"
+
+[rate_limit]
+requests_per_minute = 50
+tokens_per_minute = 400000
+burst_multiplier = 1.5
+backoff_base_ms = 1000
+backoff_max_ms = 60000
+
+[persistence]
+db_path = "~/.ra/ra.db"
+auto_checkpoint = true
+checkpoint_interval_seconds = 60
+
+[observability]
+log_level = "info"
+log_format = "pretty"
+metrics_export_path = "~/.ra/metrics/"
+
+[defaults]
+max_budget_usd = 5.0
+token_budget = 200000
