@@ -1,6 +1,6 @@
 # RA — Rust Agent Orchestrator for Claude Code
 
-RA is a high-performance agent orchestration runtime written in Rust that integrates with Claude Code as an MCP server. It enables parallel multi-agent execution, workflow pipelines with DAG dependencies, shared context between agents, checkpointing, and real-time metrics tracking.
+RA is a high-performance agent orchestration runtime written in Rust that integrates with Claude Code as an MCP server. It enables parallel multi-agent execution, workflow pipelines with DAG dependencies, shared context between agents, checkpointing, async execution with polling, workflow templates, a live TUI dashboard, and custom workflow creation.
 
 RA does not replace Claude Code — it extends it with the orchestration layer it lacks.
 
@@ -13,23 +13,32 @@ Claude Code runs agents sequentially and in isolation. RA adds:
 - **Shared context** — agents pass results to downstream agents via variable substitution
 - **Checkpoint/resume** — save workflow state to SQLite, resume after failures
 - **Async execution** — launch agents in background, poll for progress
-- **Workflow templates** — pre-built workflows for common tasks (code review, bug hunt, etc.)
+- **Workflow templates** — 5 pre-built workflows for common tasks (code review, bug hunt, etc.)
+- **Workflow builder** — validate and save custom workflows as reusable templates
+- **Live TUI dashboard** — monitor agents in real-time via Unix socket IPC
+- **Slash commands** — 10 `/ra-*` commands for quick access in Claude Code
 - **Metrics tracking** — token usage, cost, duration per agent
 
 ## Requirements
 
 - **Rust** 1.80+ (tested with 1.93)
-- **Claude Code** CLI installed (`claude` command available)
+- **Claude Code** CLI installed (`claude` command available in PATH)
 - **Claude subscription** (Pro/Max) or Anthropic API key
 - macOS or Linux
 
 ## Installation
 
+### Quick install
+
+```bash
+curl -sSL https://raw.githubusercontent.com/vpescete/ra-rust-agent-tool/main/install.sh | bash
+```
+
 ### Build from source
 
 ```bash
-git clone <repo-url> rust-agent-tool
-cd rust-agent-tool
+git clone https://github.com/vpescete/ra-rust-agent-tool.git
+cd ra-rust-agent-tool
 cargo build --release
 ```
 
@@ -37,18 +46,24 @@ This produces two binaries:
 - `target/release/ra` — standalone CLI
 - `target/release/ra-mcp-server` — MCP server for Claude Code
 
+### Install CLI globally
+
+```bash
+cargo install --path crates/ra-cli
+```
+
 ### Register as MCP server in Claude Code
 
 To make RA available in **all projects**:
 
 ```bash
-claude mcp add ra /path/to/rust-agent-tool/target/release/ra-mcp-server -s user
+claude mcp add ra /path/to/ra-mcp-server -s user
 ```
 
 To make RA available in the **current project only**:
 
 ```bash
-claude mcp add ra /path/to/rust-agent-tool/target/release/ra-mcp-server
+claude mcp add ra /path/to/ra-mcp-server
 ```
 
 Verify it's connected:
@@ -58,17 +73,21 @@ claude mcp list
 # Should show: ra: /path/to/ra-mcp-server - Connected
 ```
 
-### Optional: install CLI globally
+### Install slash commands (optional)
+
+Copy the slash command files to your Claude Code config:
 
 ```bash
-cargo install --path crates/ra-cli
+cp -r commands/ra-*.md ~/.claude/commands/
 ```
+
+This enables `/ra-review`, `/ra-bug-hunt`, `/ra-templates`, etc. in Claude Code.
 
 ## Usage as MCP server (recommended)
 
 Once registered, RA tools are available inside any Claude Code session. Claude Code will automatically use them when appropriate, or you can request them explicitly.
 
-### 11 MCP tools
+### 13 MCP tools
 
 | Tool | Description |
 |------|-------------|
@@ -79,10 +98,29 @@ Once registered, RA tools are available inside any Claude Code session. Claude C
 | `ra_run_workflow` | Execute a YAML workflow with DAG dependencies |
 | `ra_run_template` | Run a pre-built workflow template by name |
 | `ra_list_templates` | List available workflow templates |
+| `ra_validate_workflow` | Validate a workflow YAML without executing it (checks DAG, deps, variables) |
+| `ra_save_workflow` | Save a workflow YAML as a reusable template in `~/.ra/templates/` |
 | `ra_agent_status` | Show currently active runs |
 | `ra_metrics` | Metrics from last execution |
 | `ra_history` | List past executions |
 | `ra_checkpoint_list` | List checkpoints for a workflow |
+
+### Slash commands
+
+Type `/ra-` in Claude Code to see all available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/ra-review` | Pre-PR review (security, quality, test coverage) |
+| `/ra-bug-hunt` | 5 agents hunt bugs from different angles |
+| `/ra-onboard` | Generate codebase onboarding guide |
+| `/ra-migrate` | Create migration plan to a new technology |
+| `/ra-test-gen` | Generate and validate unit tests |
+| `/ra-templates` | List available workflow templates |
+| `/ra-create-workflow` | Interactive workflow builder |
+| `/ra-agents` | Run parallel agents on any task |
+| `/ra-status` | Check active runs and recent history |
+| `/ra-validate` | Validate a workflow YAML |
 
 ### Examples in Claude Code
 
@@ -101,14 +139,14 @@ Claude Code calls `ra_run_template` with `template: "pre-pr-review"`.
 
 Claude Code calls `ra_run_agents_async`, then polls with `ra_get_run_status`.
 
-**Custom workflow:**
-> "Run this workflow: first analyze the database schema, then generate migration scripts, then validate them"
+**Create and save a custom workflow:**
+> "Create a workflow that analyzes the DB schema, generates migrations, and validates them. Save it as a template called db-migration."
 
-Claude Code calls `ra_run_workflow` with inline YAML.
+Claude Code generates the YAML, calls `ra_validate_workflow`, then `ra_save_workflow`.
 
 ## Workflow templates
 
-RA ships with 5 pre-built templates. List them with `ra_list_templates`.
+RA ships with 5 pre-built templates. List them with `ra_list_templates` or `/ra-templates`.
 
 ### pre-pr-review
 
@@ -148,6 +186,14 @@ Sequential pipeline: analyze testability, generate unit tests, validate generate
 **Parameters:**
 - `target_path` — code to test (default: `.`)
 - `test_framework` — test framework (default: auto-detect)
+
+### Custom templates
+
+You can create and save your own templates:
+
+1. In Claude Code: `/ra-create-workflow` guides you interactively
+2. Or manually: create a YAML file and save it with `ra_save_workflow`
+3. Or place YAML files directly in `~/.ra/templates/`
 
 ## Custom workflows (YAML)
 
@@ -213,6 +259,29 @@ on_failure:
     step_id: alternative_step
 ```
 
+## Live TUI dashboard
+
+Monitor agents in real-time while they run. The dashboard connects to the MCP server via Unix socket IPC.
+
+**Terminal 1** — start Claude Code:
+```bash
+claude
+> "Run the bug-hunt template"
+```
+
+**Terminal 2** — launch dashboard:
+```bash
+ra dashboard
+```
+
+The dashboard shows:
+- **Overview tab** — agent metrics table + recent event log
+- **Events tab** — full-screen scrollable event log with color coding
+- Keyboard: `Tab` switch view, `j/k` scroll, `g/G` top/end, `q` quit
+- Color coding: green=completed, red=error, yellow=rate limited, cyan=agent output
+
+The dashboard requires Claude Code to be running (it creates the IPC socket at `~/.ra/ra.sock`).
+
 ## Standalone CLI usage
 
 RA also works as a standalone CLI tool without Claude Code.
@@ -233,7 +302,7 @@ ra status
 # Resume from checkpoint
 ra resume <checkpoint-id>
 
-# TUI dashboard (basic)
+# TUI dashboard
 ra dashboard
 ```
 
@@ -241,10 +310,12 @@ ra dashboard
 
 RA uses `~/.ra/config.toml` for runtime configuration. If it doesn't exist, defaults are used.
 
+The `claude` binary is auto-detected from PATH. Override with the `CLAUDE_BINARY` environment variable or in config:
+
 ```toml
 [runtime]
 max_concurrency = 4                    # max parallel agents
-claude_binary = "/opt/homebrew/bin/claude"
+claude_binary = "claude"               # auto-detected from PATH
 default_model = "sonnet"
 
 [rate_limit]
@@ -272,13 +343,14 @@ token_budget = 200000
 ## Architecture
 
 ```
-┌──────────────────────────────────────────���
+┌──────────────────────────────────────────┐
 │         Claude Code (chat + LLM)         │
 └─────────────────┬────────────────────────┘
                   │ MCP (JSON-RPC over stdio)
 ┌─────────────────▼────────────────────────┐
 │          ra-mcp-server (Rust)            │
-│  11 tools, 5 templates, async runs       │
+│  13 tools, 5 templates, async runs       │
+│  IPC broadcaster (Unix socket)           │
 ├──────────────────────────────────────────┤
 │              ra-engine                   │
 │  Agent Manager │ DAG Engine │ Scheduler  │
@@ -286,9 +358,11 @@ token_budget = 200000
 ├──────────────────────────────────────────┤
 │    ra-store (SQLite)  │  ra-observe      │
 │    Checkpoints        │  Metrics, TUI    │
+│    History            │  IPC Client      │
 ├──────────────────────────────────────────┤
 │              ra-core                     │
-│  Types, traits, errors, validation       │
+│  Types, traits, errors, DAG validation   │
+│  IPC protocol, templates, run tracking   │
 └──────────────────────────────────────────┘
          │         │         │
     claude -p  claude -p  claude -p
@@ -299,12 +373,12 @@ token_budget = 200000
 
 | Crate | Purpose |
 |-------|---------|
-| `ra-core` | Domain types, traits, errors, DAG validation |
+| `ra-core` | Domain types, traits, errors, DAG validation, IPC protocol, template types |
 | `ra-engine` | Subprocess management, DAG execution, scheduling, shared context |
 | `ra-store` | SQLite persistence for checkpoints and execution history |
-| `ra-observe` | Metrics collection, TUI dashboard, JSON/CSV export |
+| `ra-observe` | Metrics collection, TUI dashboard with tabs, IPC client, JSON/CSV export |
 | `ra-cli` | Standalone CLI binary |
-| `ra-mcp` | MCP server binary for Claude Code integration |
+| `ra-mcp` | MCP server binary, IPC broadcaster, template management |
 
 ## Development
 
@@ -312,7 +386,7 @@ token_budget = 200000
 # Build
 cargo build
 
-# Test (65 tests)
+# Test (73 tests)
 cargo test --workspace
 
 # Lint
@@ -325,13 +399,13 @@ cargo fmt --all
 cargo build --release
 ```
 
-### Adding a new template
+### Adding a new embedded template
 
 1. Create a YAML file in `templates/`
-2. Add an `include_str!` entry in `crates/ra-mcp/src/handler.rs` → `embedded_templates()`
+2. Add an `include_str!` entry in `crates/ra-mcp/src/handler.rs` -> `embedded_templates()`
 3. Rebuild: `cargo build --release -p ra-mcp`
 
-User templates can also be placed in `~/.ra/templates/` without recompiling.
+User templates can also be placed in `~/.ra/templates/` without recompiling, or saved via the `ra_save_workflow` MCP tool.
 
 ## How it works under the hood
 
@@ -340,10 +414,13 @@ User templates can also be placed in `~/.ra/templates/` without recompiling.
 3. For `ra_run_agents`: spawns N `claude -p --output-format stream-json` subprocesses
 4. A tokio semaphore limits concurrency; a token bucket handles rate limiting
 5. Each subprocess streams JSONL events which are parsed for metrics
-6. Results are collected, formatted as markdown, and returned via JSON-RPC
-7. For async runs: background tokio tasks update shared state; polling reads it
-8. For workflows: DAG engine resolves dependencies, substitutes variables, handles failures
-9. Checkpoints are saved to SQLite for crash recovery
+6. All events are forwarded via broadcast channel to the IPC broadcaster
+7. The IPC broadcaster writes events to `~/.ra/ra.sock` for the TUI dashboard
+8. Results are collected, formatted as markdown, and returned via JSON-RPC
+9. For async runs: background tokio tasks update shared state; polling reads it
+10. For workflows: DAG engine resolves dependencies, substitutes variables, handles failures
+11. Shared context allows downstream steps to access upstream outputs
+12. Checkpoints are saved to SQLite for crash recovery
 
 ## License
 
